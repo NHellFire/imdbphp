@@ -134,6 +134,14 @@ class Config {
    */
   public $force_agent = '';
 
+
+  /**
+   * Use cURL for HTTP requests
+   * @var boolean
+   */
+   const usecurl = true;
+
+
   /**
    * Constructor
    * @param string $iniFile *optional* Path to a config file containing any config overrides
