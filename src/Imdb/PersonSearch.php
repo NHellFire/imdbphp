@@ -51,10 +51,6 @@ class PersonSearch extends MdbBase {
   public function results() {
     $page = $this->getPage();
 
-    if ($this->maxresults > 0)
-      $maxresults = $this->maxresults;
-    else
-      $maxresults = 999999;
     // make sure to catch col #3, not #1 (pic only)
     //                        photo           name                   1=id        2=name        3=details
     preg_match_all('|<tr.*>\s*<td.*>.*</td>\s*<td.*<a href="/name/nm(\d{7})[^>]*>([^<]+)</a>\s*(.*)</td>|Uims', $page, $matches);
@@ -62,15 +58,13 @@ class PersonSearch extends MdbBase {
     $this->logger->debug("[Person Search] $mc matches");
     $mids_checked = array();
     for ($i = 0; $i < $mc; ++$i) {
-      if ($i == $maxresults)
-        break; // limit result count
       $pid = $matches[1][$i];
       if (in_array($pid, $mids_checked))
         continue;
       $mids_checked[] = $pid;
       $name = $matches[2][$i];
       $info = $matches[3][$i];
-      $resultPerson = Person::fromSearchResults($pid, $name, $this);
+      $resultPerson = Person::fromSearchResults($pid, $name, $this->config, $this->logger, $this->cache);
       if (!empty($info)) {
         if (preg_match('|<small>\((.*),\s*<a href="/title/tt(\d{7}).*"\s*>(.*)</a>\s*\((\d{4})\)\)|Ui', $info, $match)) {
           $role = $match[1];
@@ -91,12 +85,7 @@ class PersonSearch extends MdbBase {
    * @return string url
    */
   protected function buildUrl($context = null) {
-    $query = "&s=nm";
-    if (!isset($this->maxresults))
-      $this->maxresults = 20;
-    if ($this->maxresults > 0)
-      $query .= "&mx=20";
-    return "http://" . $this->imdbsite . "/find?q=" . urlencode($this->name) . $query;
+    return "http://" . $this->imdbsite . "/find?q=" . urlencode($this->name) . "&s=nm";
   }
 
 }

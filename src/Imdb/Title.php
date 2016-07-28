@@ -10,6 +10,7 @@
  #############################################################################
 
 namespace Imdb;
+use Psr\Log\LoggerInterface;
 
  /**
   * A title on IMDb
@@ -146,10 +147,12 @@ class Title extends MdbBase {
    * @param int $year
    * @param string $type
    * @param Config $config
+   * @param LoggerInterface $logger OPTIONAL override default logger
+   * @param CacheInterface $cache OPTIONAL override default cache
    * @return Title
    */
-  public static function fromSearchResult($id, $title, $year, $type, Config $config = null) {
-    $imdb = new Title($id, $config);
+  public static function fromSearchResult($id, $title, $year, $type, Config $config = null, LoggerInterface $logger = null, CacheInterface $cache = null) {
+    $imdb = new Title($id, $config, $logger, $cache);
     $imdb->main_title = $title;
     $imdb->main_year = (int)$year;
     $imdb->main_movietype = $type;
@@ -157,98 +160,14 @@ class Title extends MdbBase {
   }
 
   /**
-   * @param string $id IMDBID to use for data retrieval
+   * @param string $id IMDb ID. e.g. 285331 for http://www.imdb.com/title/tt0285331/
    * @param Config $config OPTIONAL override default config
+   * @param LoggerInterface $logger OPTIONAL override default logger
+   * @param CacheInterface $cache OPTIONAL override default cache
    */
-  public function __construct($id, Config $config = null) {
-    parent::__construct($config);
+  public function __construct($id, Config $config = null, LoggerInterface $logger = null, CacheInterface $cache = null) {
+    parent::__construct($config, $logger, $cache);
     $this->setid($id);
-  }
-
-  /**
-   * Reset all in object caching data e.g. page strings and parsed values
-   */
-  protected function reset_vars() {
-   $this->page = array();
-
-   $this->akas = array();
-   $this->awards = array();
-   $this->countries = array();
-   $this->castlist = array(); // pilot only
-   $this->crazy_credits = array();
-   $this->credits_cast = array();
-   $this->credits_composer = array();
-   $this->credits_director = array();
-   $this->credits_producer = array();
-   $this->credits_writing = array();
-   $this->extreviews = array();
-   $this->goofs = array();
-   $this->langs = array();
-   $this->langs_full = array();
-   $this->aspectratio = "";
-   $this->main_comment = "";
-   $this->main_genre = "";
-   $this->main_keywords = array();
-   $this->all_keywords = array();
-   $this->main_language = "";
-   $this->main_photo = "";
-   $this->main_thumb = "";
-   $this->main_pictures = array();
-   $this->main_plotoutline = "";
-   $this->main_rating = -1;
-   $this->main_runtime = "";
-   $this->main_movietype = "";
-   $this->main_title = "";
-   $this->original_title = "";
-   $this->main_votes = -1;
-   $this->main_year = -1;
-   $this->main_endyear = -1;
-   $this->main_yearspan = array();
-   $this->main_creator = array();
-   $this->main_tagline = "";
-   $this->main_storyline = "";
-   $this->main_prodnotes = array();
-   $this->main_movietypes = array();
-   $this->main_top250 = -1;
-   $this->moviecolors = array();
-   $this->movieconnections = array();
-   $this->moviegenres = array();
-   $this->moviequotes = array();
-   $this->movierecommendations = array();
-   $this->movieruntimes = array();
-   $this->mpaas = array();
-   $this->mpaas_hist = array();
-   $this->mpaa_justification = "";
-   $this->plot_plot = array();
-   $this->synopsis_wiki = "";
-   $this->release_info = array();
-   $this->seasoncount = -1;
-   $this->season_episodes = array();
-   $this->sound = array();
-   $this->soundtracks = array();
-   $this->split_comment = array();
-   $this->split_plot = array();
-   $this->taglines = array();
-   $this->trailers = array();
-   $this->video_sites = array();
-   $this->soundclip_sites = array();
-   $this->photo_sites = array();
-   $this->misc_sites = array();
-   $this->trivia = array();
-   $this->compcred_prod = array();
-   $this->compcred_dist = array();
-   $this->compcred_special = array();
-   $this->compcred_other = array();
-   $this->parental_guide = array();
-   $this->official_sites = array();
-   $this->locations = array();
-   $this->budget = null;
-   $this->openingWeekend = array();
-   $this->gross = array();
-   $this->weekendGross = array();
-   $this->admissions = array();
-   $this->filmingDates = array();
-   $this->moviealternateversions = array();
   }
 
  #-------------------------------------------------------------[ Open Page ]---
@@ -1669,15 +1588,17 @@ class Title extends MdbBase {
    * @version Attention: Starting with revision 506 (version 2.1.3), the outer array no longer starts at 0 but reflects the real season number!
    */
   public function episodes() {
-    if ( !$this->is_serial() && !$this->seasons() ) return $this->season_episodes;
-    if ( empty($this->season_episodes) ) {
-      if ( !$this->seasons() ) {
+    if (!$this->is_serial() && !$this->seasons()) {
+        return array();
+    }
+
+    if (empty($this->season_episodes)) {
+      if (!$this->seasons()) {
         $ser = $this->get_episode_details();
-        $tid = $this->imdbID;
-        if (isset($ser['imdbid'])) $this->imdbID = $ser['imdbid'];
-        else return $this->season_episodes;
-      } else {
-        $tid = $this->imdbID;
+        if (isset($ser['imdbid'])) {
+          $show = new Title($ser['imdbid'], $this->config);
+          return $this->season_episodes = $show->episodes();
+        } else return array();
       }
       $page = $this->getPage("Episodes");
       if (empty($page)) return $this->season_episodes; // no such page
@@ -1695,6 +1616,7 @@ class Title extends MdbBase {
           $ec = count($eps[0]);
           for ($ep=0; $ep<$ec; ++$ep) {
             $plot = preg_replace('#<a href="[^"]+"\s+>Add a Plot</a>#', '', trim($eps['plot'][$ep]));
+            $plot = preg_replace('#Know what this is about\?<br>\s*<a href="[^"]+"\s*> Be the first one to add a plot.\s*</a>#ims', '', $plot);
             $this->season_episodes[$s][$eps['episodeNumber'][$ep]] = array(
               'imdbid'  => $eps['imdbid'][$ep],
               'title'   => trim($eps['title'][$ep]),
@@ -1706,7 +1628,6 @@ class Title extends MdbBase {
           }
         }
       }
-      $this->imdbID = $tid;
     }
     return $this->season_episodes;
   }

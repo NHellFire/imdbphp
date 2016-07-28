@@ -9,6 +9,7 @@
  #############################################################################
 
 namespace Imdb;
+use Psr\Log\LoggerInterface;
 
 /**
  * Accessing Movie information
@@ -17,7 +18,7 @@ namespace Imdb;
  * @copyright (c) 2002-2004 by Giorgos Giagas and (c) 2004-2009 by Itzchak Rehberg and IzzySoft
  */
 class MdbBase extends Config {
-  public $version = '3.3.0';
+  public $version = '4.1.0';
 
   protected $months = array(
       "January" => "01",
@@ -35,12 +36,12 @@ class MdbBase extends Config {
     );
 
   /**
-   * @var Cache
+   * @var CacheInterface
    */
   protected $cache;
 
   /**
-   * @var Logger
+   * @var LoggerInterface
    */
   protected $logger;
 
@@ -56,12 +57,17 @@ class MdbBase extends Config {
 
   protected $page = array();
 
+  /**
+   * @var string 7 digit identifier for this person
+   */
   protected $imdbID;
 
   /**
    * @param Config $config OPTIONAL override default config
+   * @param LoggerInterface $logger OPTIONAL override default logger
+   * @param CacheInterface $cache OPTIONAL override default cache
    */
-  public function __construct(Config $config = null) {
+  public function __construct(Config $config = null, LoggerInterface $logger = null, CacheInterface $cache = null) {
     parent::__construct();
 
     if ($config) {
@@ -71,35 +77,33 @@ class MdbBase extends Config {
     }
 
     $this->config = $config ?: $this;
-    $this->logger = new Logger($this->debug);
-    $this->cache = new Cache($this->config, $this->logger);
+    $this->logger = empty($logger) ? new Logger($this->debug) : $logger;
+    $this->cache = empty($cache) ? new Cache($this->config, $this->logger) : $cache;
     $this->pages = new Pages($this->config, $this->cache, $this->logger);
 
-    if ($this->storecache && ($this->cache_expire > 0)) {
-      $this->cache->purge();
-    }
-  }
-
-  /**
-   * Setup class for a new IMDB id
-   * @param string id IMDBID of the requested movie
-   * @TODO remove this / make it private
-   * @TODO allow numeric ids and coerce them into 7 digit strings
-   * @TODO why is this in mdbbase when the base has no id ...
-   */
-  public function setid ($id) {
-    if (!preg_match("/^\d{7}$/",$id)) $this->debug_scalar("<BR>setid: Invalid IMDB ID '$id'!<BR>");
-    $this->imdbID = $id;
-    $this->reset_vars();
+    $this->cache->purge();
   }
 
   /**
    * Retrieve the IMDB ID
    * @return string id IMDBID currently used
-   * @TODO why is this in mdbbase when the base has no id ...
    */
   public function imdbid() {
     return $this->imdbID;
+  }
+
+  /**
+   * Set and validate the IMDb ID
+   * @param string id IMDb ID
+   */
+  protected function setid ($id) {
+    if (is_numeric($id)) {
+      $this->imdbID = str_pad($id, 7, '0', STR_PAD_LEFT);
+    } elseif (preg_match("/(?:nm|tt)(\d{7})/", $id, $matches)) {
+      $this->imdbID = $matches[1];
+    } else {
+      $this->debug_scalar("<BR>setid: Invalid IMDB ID '$id'!<BR>");
+    }
   }
 
  #---------------------------------------------------------[ Debug helpers ]---
@@ -138,13 +142,6 @@ class MdbBase extends Config {
    */
   protected function buildUrl($context = null) {
     return '';
-  }
-
-  /**
-   * Reset page vars
-   */
-  protected function reset_vars() {
-    return;
   }
 
 }

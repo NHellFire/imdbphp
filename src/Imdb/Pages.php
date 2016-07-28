@@ -1,6 +1,7 @@
 <?php
 
 namespace Imdb;
+use Psr\Log\LoggerInterface;
 
 /**
  * Handles requesting urls, including the caching layer
@@ -13,12 +14,12 @@ class Pages {
   protected $config;
 
   /**
-   * @var Cache
+   * @var CacheInterface
    */
   protected $cache;
 
   /**
-   * @var Logger
+   * @var LoggerInterface
    */
   protected $logger;
   protected $pages = array();
@@ -26,10 +27,10 @@ class Pages {
 
   /**
    * @param Config $config
-   * @param Cache $cache
-   * @param Logger $logger
+   * @param CacheInterface $cache
+   * @param LoggerInterface $logger
    */
-  public function __construct(Config $config, Cache $cache, Logger $logger) {
+  public function __construct(Config $config, CacheInterface $cache, LoggerInterface $logger) {
     $this->config = $config;
     $this->cache = $cache;
     $this->logger = $logger;

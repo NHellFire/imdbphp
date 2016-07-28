@@ -1,6 +1,7 @@
 <?php
 
 namespace Imdb;
+use Psr\Log\LoggerInterface;
 
 /**
  * File caching
@@ -8,25 +9,22 @@ namespace Imdb;
  *
  * Config keys used: cachedir cache_expire usezip converttozip usecache storecache
  */
-class Cache {
-
+class Cache extends CacheBase {
   /**
-   * @var Config
+   * Cache constructor.
+   * @param Config $config
+   * @param LoggerInterface $logger
+   * @throws Exception
    */
-  protected $config;
-
-  /**
-   * @var Logger
-   */
-  protected $logger;
-
-  public function __construct(Config $config, Logger $logger) {
-    $this->config = $config;
-    $this->logger = $logger;
+  public function __construct(Config $config, LoggerInterface $logger) {
+    parent::__construct($config, $logger);
 
     if (($this->config->usecache || $this->config->storecache) && !is_dir($this->config->cachedir)) {
-      $this->logger->critical("[Cache] Configured cache directory [{$this->config->cachedir}] does not exist!");
-      throw new Exception("[Cache] Configured cache directory [{$this->config->cachedir}] does not exist!");
+      @mkdir($this->config->cachedir, 0700, true);
+      if (!is_dir($this->config->cachedir)) {
+        $this->logger->critical("[Cache] Configured cache directory [{$this->config->cachedir}] does not exist!");
+        throw new Exception("[Cache] Configured cache directory [{$this->config->cachedir}] does not exist!");
+      }
     }
     if ($this->config->storecache && !is_writable($this->config->cachedir)) {
       $this->logger->critical("[Cache] Configured cache directory [{$this->config->cachedir}] lacks write permission!");
@@ -35,22 +33,15 @@ class Cache {
   }
 
   /**
-   * Get string value of $key from cache
-   * @param string $key
-   * @return string|null null on failure / cache miss
+   * @inheritdoc
    */
-  public function get($key) {
-    if (!$this->config->usecache) {
-      return null;
-    }
-
-    $cleanKey = $this->sanitiseKey($key);
-
+  public function getInternal($key, $cleanKey) {
     $fname = $this->config->cachedir . '/' . $cleanKey;
     if (!file_exists($fname)) {
       $this->logger->debug("[Cache] Cache miss for [$key]");
       return null;
     }
+
     $this->logger->debug("[Cache] Cache hit for [$key]");
     if ($this->config->usezip) {
       if (($content = @join("", @gzfile($fname)))) {
@@ -65,6 +56,7 @@ class Cache {
             @gzclose($fp);
           }
         }
+
         return $content;
       }
     } else { // no zip
@@ -73,18 +65,9 @@ class Cache {
   }
 
   /**
-   * Store $value to the disk cache
-   * @param string $key
-   * @param string $value
-   * @return bool successful?
+   * @inheritdoc
    */
-  public function set($key, $value) {
-    if (!$this->config->storecache) {
-      return false;
-    }
-
-    $cleanKey = $this->sanitiseKey($key);
-
+  public function setInternal($key, $cleanKey, $value) {
     $fname = $this->config->cachedir . '/' . $cleanKey;
     $this->logger->debug("[Cache] Writing key [$key] to [$fname]");
     if ($this->config->usezip) {
@@ -95,17 +78,17 @@ class Cache {
       $this->logger->debug("[Cache] Writing $fname");
       file_put_contents($fname, $value);
     }
-
-    return true;
   }
 
   /**
-   * Check cache and purge outdated files
+   * @inheritdoc
+   *
    * This method looks for files older than the cache_expire set in the
    * mdb_config and removes them
+   *
    * @TODO add a limit on how frequently a purge can occur
    */
-  public function purge() {
+  public function purgeInternal() {
     $cacheDir = $this->config->cachedir;
     $this->logger->debug("[Cache] Purging old cache entries");
 
@@ -122,9 +105,4 @@ class Cache {
       }
     }
   }
-
-  private function sanitiseKey($key) {
-    return str_replace(array('/', '\\', '?', '%', '*', ':', '|', '"', '<', '>'), '.', $key);
-  }
-
 }

@@ -21,25 +21,19 @@ namespace Imdb;
 class Config {
 
   /**
-   * IMDB server to use.
-   * choices are www.imdb.&lt;lang&gt; with &lt;lang&gt; being one of
-   * de|es|fr|it|pt, uk.imdb.com, and akas.imdb.com - the localized ones are
-   * only qualified to find the movies IMDB ID (with the imdbsearch class;
-   * akas.imdb.com will be the best place to search as it has all AKAs) -- but
-   * parsing (with the imdb class) for most of the details will fail for
-   * most of the details.
-   * @var string imdbsite
-   */
-  public $imdbsite = "akas.imdb.com";
-
-  /**
-   * Tell IMDB which is the preferred language.
+   * Set the language Imdb will use for titles
    * Any valid language code can be used here (e.g. en-US, de, pt-BR).
    * If this option is specified, the Accept-Language header with this value
    * will be included in the requests.
    * @var string
    */
   public $language = "";
+
+  /**
+   * IMDB domain to use.
+   * @var string imdbsite
+   */
+  public $imdbsite = "www.imdb.com";
 
   /**
    * Directory to store the cache files. This must be writable by the web
@@ -75,9 +69,10 @@ class Config {
   /**
    * Cache expiration - cache files older than this value (in seconds) will
    * be automatically deleted.
+   * If 0 cache will never expire
    * @var integer
    */
-  public $cache_expire = 3600;
+  public $cache_expire = 604800;
 
   /**
    * Where to store images retrieved from the IMDB site by the method photo_localurl().
@@ -114,19 +109,12 @@ class Config {
   public $throwHttpExceptions = true;
 
   #--------------------------------------------------=[ TWEAKING OPTIONS ]=--
-  /**
-   * Limit for the result set of searches.
-   * Use 0 for no limit, or the number of maximum entries you wish. Default
-   * (when commented out) is 20.
-   * @var integer
-   */
-  public $maxresults = 20;
 
   /**
    * Set the default user agent (if none is detected)
    * @var string
    */
-  public $default_agent = 'Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3';
+  public $default_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:47.0) Gecko/20100101 Firefox/47.0';
 
   /**
    * Enforce the use of a special user agent
